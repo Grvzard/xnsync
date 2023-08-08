@@ -55,10 +55,18 @@ fn main() -> io::Result<()> {
     for repo_name in pre_list.iter() {
         let src_git_path = config.src_dir.join(repo_name);
         let dst_git_path = config.dst_dir.join(repo_name);
-        if dst_git_path.exists() && dst_git_path.is_dir() && contains_git_dir(&dst_git_path) {
-            let repo = Repository::open(&dst_git_path).unwrap();
-            dst_repos.push(repo);
-            continue;
+        if dst_git_path.exists() {
+            if dst_git_path.is_dir() && contains_git_dir(&dst_git_path) {
+                let repo = Repository::open(&dst_git_path).unwrap();
+                dst_repos.push(repo);
+                println!("already exists: {}", repo_name.to_str().unwrap());
+                continue;
+            } else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "destination directory exists and is not a git repo",
+                ));
+            }
         }
         match Repository::clone(src_git_path.to_str().unwrap(), &dst_git_path) {
             Ok(repo) => dst_repos.push(repo),
@@ -77,7 +85,8 @@ fn main() -> io::Result<()> {
     fetch_opts.prune(FetchPrune::On);
     for repo in dst_repos.iter() {
         let mut remote = repo.find_remote("origin").unwrap();
-        remote.fetch(&[""], Some(&mut fetch_opts), None).unwrap();
+        remote.fetch(&["main"], Some(&mut fetch_opts), None).unwrap();
+        println!("fetched: {}", repo.path().to_str().unwrap());
     }
 
     Ok(())
